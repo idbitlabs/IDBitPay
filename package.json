@@ -1,0 +1,19 @@
+{
+  "name": "idbitpay",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "start": "turbo start",
+    "lint": "turbo lint",
+    "clean": "turbo run clean --parallel"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.6"
+  }
+}
