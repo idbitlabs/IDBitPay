@@ -1,33 +1,38 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import QRCode from "react-qr-code";
+import { env } from "../lib/eth";
+import { api } from "../lib/api";
+import { useToast } from "./ToastProvider";
 
-export default function PaymentQR({ merchantAddress }) {
-  const [amount, setAmount] = useState("");
-  const [desc, setDesc] = useState("");
-  const [data, setData] = useState(null);
 
-  const generate = () => {
-    const qrData = {
-      merchant: merchantAddress,
-      amount: amount,
-      token: "IDT",
-      desc: desc
-    };
-    setData(JSON.stringify(qrData));
-  };
+export default function PaymentQR({ merchant }){
+const [amount, setAmount] = useState("");
+const [memo, setMemo] = useState("");
+const [payload, setPayload] = useState(null);
+const toast = useToast();
 
-  return (
-    <div>
-      <h2>Buat QR Pembayaran</h2>
-      <input placeholder="Jumlah IDT" value={amount} onChange={(e)=>setAmount(e.target.value)} />
-      <input placeholder="Keterangan" value={desc} onChange={(e)=>setDesc(e.target.value)} />
-      <button onClick={generate}>Generate</button>
-      {data && (
-        <div style={{ marginTop: 20 }}>
-          <QRCode value={data} />
-        </div>
-      )}
-    </div>
-  );
+
+async function create(){
+try {
+const r = await api("/payments/create", { method: "POST", body: JSON.stringify({ merchant, amountIdt: amount, memo }) });
+setPayload({ ...r.qrPayload, qrHash: r.qrHash });
+toast.push("QR dibuat", "success");
+} catch(e){ toast.push(e.message, "error"); }
 }
+
+
+return (
+<div style={{display:"grid", gap:8}}>
+<h3>Buat QR Pembayaran</h3>
+<input placeholder="Jumlah IDT" value={amount} onChange={(e)=>setAmount(e.target.value)} />
+<input placeholder="Keterangan" value={memo} onChange={(e)=>setMemo(e.target.value)} />
+<button onClick={create} disabled={!merchant || !amount}>Generate</button>
+{payload && (
+<div style={{background:"white", padding:12, width:256}}>
+<QRCode value={JSON.stringify(payload)} size={256} />
+</div>
+)}
+</div>
+);
+};

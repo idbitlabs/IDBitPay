@@ -1,57 +1,56 @@
 "use client";
 import { useState } from "react";
 import { ethers } from "ethers";
-import { QrReader } from "react-qr-reader";
+import QRScanner from "../components/QRScanner";
+import { getSigner, TOKEN_ABI, env, toUnits } from "../lib/eth";
+import { useToast } from "./ToastProvider";
 
-export default function TransferForm({ tokenAddress }) {
-  const [recipient, setRecipient] = useState("");
-  const [amount, setAmount] = useState("");
-  const [scanning, setScanning] = useState(false);
 
-  const handleScan = (result) => {
-    if (result?.text) {
-      const data = JSON.parse(result.text);
-      setRecipient(data.merchant || data.wallet);
-      setAmount(data.amount || "");
-      setScanning(false);
-    }
-  };
+export default function TransferForm(){
+const [recipient, setRecipient] = useState("");
+const [amount, setAmount] = useState("");
+const [showQR, setShowQR] = useState(false);
+const [loading, setLoading] = useState(false);
+const toast = useToast();
 
-  const sendTransfer = async () => {
-    if (!window.ethereum) return alert("Wallet not found");
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
-    const token = new ethers.Contract(
-      tokenAddress,
-      ["function transfer(address to,uint256 value) public returns (bool)"],
-      signer
-    );
-    const tx = await token.transfer(recipient, ethers.parseUnits(amount, 9));
-    await tx.wait();
-    alert("Transfer berhasil!");
-  };
 
-  return (
-    <div>
-      <h2>Transfer IDT</h2>
-      {scanning ? (
-        <QrReader onResult={handleScan} style={{ width: "100%" }} />
-      ) : (
-        <>
-          <input
-            placeholder="Wallet tujuan"
-            value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
-          />
-          <input
-            placeholder="Jumlah IDT"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          <button onClick={sendTransfer}>Kirim</button>
-          <button onClick={() => setScanning(true)}>Scan QR</button>
-        </>
-      )}
-    </div>
-  );
+const handleScan = (raw) => {
+try {
+let data; try { data = JSON.parse(raw); } catch(_e){}
+if (data?.wallet) setRecipient(data.wallet);
+else if (ethers.isAddress(raw)) setRecipient(raw);
+setShowQR(false);
+toast.push("QR dibaca", "success");
+} catch(e){ toast.push("QR tidak valid", "error"); }
+};
+
+
+const send = async () => {
+try {
+setLoading(true);
+const signer = await getSigner();
+const token = new ethers.Contract(env.token, TOKEN_ABI, signer);
+const tx = await token.transfer(recipient, toUnits(amount, 9));
+toast.push("TX terkirim: " + tx.hash);
+await tx.wait();
+toast.push("Transfer berhasil!", "success");
+setAmount("");
+} catch (e){
+console.error(e); toast.push(e?.shortMessage || e?.message || "Gagal kirim", "error");
+} finally { setLoading(false); }
+};
+
+
+return (
+<div style={{display:"grid", gap:12}}>
+<h2>Transfer IDT ke Member</h2>
+<input value={recipient} onChange={e=>setRecipient(e.target.value)} placeholder="Wallet tujuan 0x.." />
+<div style={{display:"flex", gap:8}}>
+<input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Jumlah IDT" />
+<button onClick={()=>setShowQR(true)}>Scan QR</button>
+</div>
+<button disabled={!recipient||!amount||loading} onClick={send}>{loading?"Mengirim..":"Kirim"}</button>
+{showQR && <QRScanner onScan={handleScan} onClose={()=>setShowQR(false)} />}
+</div>
+);
 }
