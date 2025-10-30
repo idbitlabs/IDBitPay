@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 /**
- * MerchantGatewayUpgradable with Staking Revenue Route (flat 0.3%)
+ * IDBitPay — Merchant Gateway Upgradable with Staking Revenue Route (flat 0.3%)
  * - UUPS upgradable
  * - Flat fee default 0.3% (feeBps = 30)
  * - 100% fee dikirim ke staking pool (transfer atau transfer+notify)
@@ -21,7 +21,7 @@ interface IStakingReceiver {
     function notifyRevenue(uint256 amount) external;
 }
 
-contract MerchantGatewayUp is
+contract IDBitPay is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
@@ -178,10 +178,8 @@ contract MerchantGatewayUp is
             // Transfer + optional notify (langsung memperkaya pool)
             token.safeTransfer(recv, fee);
 
-            // Coba panggil notifyRevenue kalau ada (non-revert jika function tidak ada)
-            (bool ok, ) = recv.call(abi.encodeWithSelector(IStakingReceiver.notifyRevenue.selector, fee));
-            // jika staking tidak punya notifyRevenue(), panggilan akan gagal → biarkan silent fail? atau require?
-            // kita biarkan OK=false tetap lanjut, agar kompatibel; pencatatan tetap melalui event.
+            // Coba panggil notifyRevenue kalau ada; dibiarkan non-revert agar kompatibel
+            (bool /*ok*/, ) = recv.call(abi.encodeWithSelector(IStakingReceiver.notifyRevenue.selector, fee));
             emit FeeRoutedToStaking(fee, true);
         }
     }
@@ -195,9 +193,8 @@ contract MerchantGatewayUp is
 
         token.safeTransfer(stakingReceiver, amt);
 
-        // coba notifyRevenue(amt)
-        (bool ok, ) = stakingReceiver.call(abi.encodeWithSelector(IStakingReceiver.notifyRevenue.selector, amt));
-        // boleh diabaikan jika tidak ada method-nya
+        // coba notifyRevenue(amt); non-revert jika tidak ada
+        (bool /*ok*/, ) = stakingReceiver.call(abi.encodeWithSelector(IStakingReceiver.notifyRevenue.selector, amt));
 
         emit Swept(amt);
     }
